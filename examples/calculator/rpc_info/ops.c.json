@@ -1,0 +1,32 @@
+[
+    {
+	"function_name": "add",
+	"params": ["int", "int"],
+	"result": "int"
+    },
+    {
+	"function_name": "subtract",
+	"params": ["int", "int"],
+	"result": "int"
+    },
+    {
+	"function_name": "multiply",
+	"params": ["int", "int"],
+	"result": "int"
+    },
+    {
+	"function_name": "divide",
+	"params": ["int", "int"],
+	"result": "int"
+    },
+    {
+	"function_name": "modulo",
+	"params": ["int", "int"],
+	"result": "int"
+    },
+    {
+	"function_name": "negate",
+	"params": ["int"],
+	"result": "int"
+    }
+]
