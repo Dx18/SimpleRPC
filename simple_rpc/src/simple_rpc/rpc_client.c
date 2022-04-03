@@ -1,11 +1,64 @@
 #include "simple_rpc/rpc_client.h"
 
+#include <arpa/inet.h>
 #include <unistd.h>
 
 #include "simple_rpc/rpc_deserialize.h"
 #include "simple_rpc/rpc_serialize.h"
 #include "simple_rpc/rpc_value.h"
 #include "util/byte_buffer.h"
+
+void rpc_client_init(
+    struct RPCClient* client,
+    const struct sockaddr* address,
+    size_t address_length)
+{
+    client->address = malloc(address_length);
+    *client->address = *address;
+    client->address_len = address_length;
+}
+
+void rpc_client_destroy(struct RPCClient* client)
+{
+    free(client->address);
+}
+
+int rpc_client_init_ipv4(
+    struct RPCClient* client,
+    const char* address,
+    uint16_t port)
+{
+    struct in_addr address_converted;
+    if (!inet_pton(AF_INET, address, &address_converted)) {
+        return 0;
+    }
+    struct sockaddr_in address_full = {
+        .sin_family = AF_INET,
+        .sin_port = htons(port),
+        .sin_addr = address_converted};
+    rpc_client_init(
+        client, (const struct sockaddr*)&address_full, sizeof(address_full));
+    return 1;
+}
+
+int rpc_client_init_ipv6(
+    struct RPCClient* client,
+    const char* address,
+    uint16_t port)
+{
+    struct in6_addr address_converted;
+    if (!inet_pton(AF_INET, address, &address_converted)) {
+        return 0;
+    }
+    struct sockaddr_in6 address_full = {
+        .sin6_family = AF_INET6,
+        .sin6_port = htons(port),
+        .sin6_addr = address_converted,
+    };
+    rpc_client_init(
+        client, (const struct sockaddr*)&address_full, sizeof(address_full));
+    return 1;
+}
 
 static int write_rpc_values(int fd, struct RPCValue* values, size_t count)
 {
@@ -24,8 +77,7 @@ static int write_rpc_values(int fd, struct RPCValue* values, size_t count)
 }
 
 struct RPCResult rpc_call_array(
-    const struct sockaddr* addr,
-    size_t addr_len,
+    const struct RPCClient* rpc_client,
     const char* procedure_name,
     struct RPCValue* args,
     size_t arg_count)
@@ -37,7 +89,7 @@ struct RPCResult rpc_call_array(
             .value = rpc_string("Could not create client socket")};
     }
 
-    if (connect(client, addr, addr_len) == -1) {
+    if (connect(client, rpc_client->address, rpc_client->address_len) == -1) {
         close(client);
         return (struct RPCResult){
             .is_error = 1, .value = rpc_string("Could not connect to server")};
@@ -84,11 +136,8 @@ struct RPCResult rpc_call_array(
     return (struct RPCResult){.is_error = 0, .value = response};
 }
 
-struct RPCResult rpc_call(
-    const struct sockaddr* addr,
-    size_t addr_len,
-    const char* procedure_name,
-    ...)
+struct RPCResult
+rpc_call(const struct RPCClient* rpc_client, const char* procedure_name, ...)
 {
     va_list args;
 
@@ -105,7 +154,7 @@ struct RPCResult rpc_call(
     va_end(args);
 
     if (arg_count == 0) {
-        return rpc_call_array(addr, addr_len, procedure_name, NULL, 0);
+        return rpc_call_array(rpc_client, procedure_name, NULL, 0);
     }
 
     struct RPCValue values[arg_count];
@@ -120,5 +169,5 @@ struct RPCResult rpc_call(
     }
     va_end(args);
 
-    return rpc_call_array(addr, addr_len, procedure_name, values, arg_count);
+    return rpc_call_array(rpc_client, procedure_name, values, arg_count);
 }

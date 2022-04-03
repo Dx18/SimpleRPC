@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,10 +28,8 @@ void rpc_value_print(struct RPCValue value)
 
 int main()
 {
-    struct sockaddr_in addr = {
-        .sin_family = AF_INET,
-        .sin_addr = {.s_addr = inet_addr("127.0.0.1")},
-        .sin_port = htons(12000)};
+    struct RPCClient client;
+    rpc_client_init_ipv4(&client, "127.0.0.1", 12000);
 
     while (1) {
         const char* kWhitespace = " \f\n\r\t\v";
@@ -102,11 +101,7 @@ int main()
             printf("Name of procedure must be string\n");
         } else {
             struct RPCResult result = rpc_call_array(
-                (const struct sockaddr*)&addr,
-                sizeof(addr),
-                values[0].value_string,
-                values + 1,
-                count - 1);
+                &client, values[0].value_string, values + 1, count - 1);
 
             if (result.is_error) {
                 printf("Error: ");
@@ -125,6 +120,8 @@ int main()
             rpc_value_destroy(&values[i]);
         }
     }
+
+    rpc_client_destroy(&client);
 
     return 0;
 }
