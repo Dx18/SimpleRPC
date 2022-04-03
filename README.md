@@ -10,6 +10,7 @@ Building everything:
 mkdir build
 cd build
 cmake ..
+make
 ```
 
 All examples will be located at `examples` directory.
