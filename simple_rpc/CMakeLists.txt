@@ -2,6 +2,7 @@ project(SimpleRPCLib)
 
 set(SIMPLE_RPC_LIB_SOURCE
   src/simple_rpc/rpc_value.c
+  src/simple_rpc/rpc_result.c
   src/simple_rpc/rpc_serialize.c
   src/simple_rpc/rpc_deserialize.c
   src/simple_rpc/rpc_server.c

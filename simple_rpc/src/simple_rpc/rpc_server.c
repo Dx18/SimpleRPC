@@ -10,10 +10,11 @@
 
 #include "simple_rpc/rpc_deserialize.h"
 #include "simple_rpc/rpc_procedure.h"
+#include "simple_rpc/rpc_result.h"
 #include "simple_rpc/rpc_serialize.h"
 #include "simple_rpc/rpc_value.h"
 
-static struct RPCValue handle_request(
+static struct RPCResult handle_request(
     const struct MutableByteBuffer* request,
     const struct RPCProcedure* procedures,
     size_t procedure_count)
@@ -23,12 +24,13 @@ static struct RPCValue handle_request(
     struct RPCValue procedure_name;
     if (rpc_value_deserialize(request, &index, &procedure_name) !=
         kRPCDeserializeResultOk) {
-        return rpc_string("Could not deserialize procedure name");
+        return rpc_result_error(
+            rpc_string("Could not deserialize procedure name"));
     }
 
     if (procedure_name.type != kRPCValueTypeString) {
         rpc_value_destroy(&procedure_name);
-        return rpc_string("Name of procedure must be string");
+        return rpc_result_error(rpc_string("Name of procedure must be string"));
     }
 
     for (size_t i = 0; i < procedure_count; ++i) {
@@ -38,15 +40,16 @@ static struct RPCValue handle_request(
             struct RPCValue value = procedures[i].caller(request, &index);
             if (index != mut_byte_buffer_length(request)) {
                 rpc_value_destroy(&value);
-                return rpc_string("Client sent additional information");
+                return rpc_result_error(
+                    rpc_string("Client sent additional information"));
             }
 
-            return value;
+            return rpc_result_ok(value);
         }
     }
 
     rpc_value_destroy(&procedure_name);
-    return rpc_string("Unknown procedure");
+    return rpc_result_error(rpc_string("Unknown procedure"));
 }
 
 static void handle_client(
@@ -62,7 +65,7 @@ static void handle_client(
         return;
     }
 
-    struct RPCValue response =
+    struct RPCResult response =
         handle_request(&buffer, procedures, procedure_count);
 
     mut_byte_buffer_destroy(&buffer);
@@ -70,9 +73,10 @@ static void handle_client(
     struct MutableByteBuffer response_buffer;
     mut_byte_buffer_init(&response_buffer);
 
-    rpc_value_serialize(response, &response_buffer);
+    rpc_value_serialize(rpc_int(response.is_error), &response_buffer);
+    rpc_value_serialize(response.value, &response_buffer);
 
-    rpc_value_destroy(&response);
+    rpc_value_destroy(&response.value);
 
     mut_byte_buffer_write(&response_buffer, client);
     mut_byte_buffer_destroy(&response_buffer);

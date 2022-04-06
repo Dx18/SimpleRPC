@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include "simple_rpc/rpc_deserialize.h"
+#include "simple_rpc/rpc_result.h"
 #include "simple_rpc/rpc_serialize.h"
 #include "simple_rpc/rpc_value.h"
 #include "util/byte_buffer.h"
@@ -84,15 +85,12 @@ struct RPCResult rpc_call_array(
 {
     int client = socket(AF_INET, SOCK_STREAM, 0);
     if (client == -1) {
-        return (struct RPCResult){
-            .is_error = 1,
-            .value = rpc_string("Could not create client socket")};
+        return rpc_result_error(rpc_string("Could not creaate client socket"));
     }
 
     if (connect(client, rpc_client->address, rpc_client->address_len) == -1) {
         close(client);
-        return (struct RPCResult){
-            .is_error = 1, .value = rpc_string("Could not connect to server")};
+        return rpc_result_error(rpc_string("Could not connect to server"));
     }
 
     struct RPCValue procedure_name_value = rpc_string(procedure_name);
@@ -101,8 +99,7 @@ struct RPCResult rpc_call_array(
         write_rpc_values(client, args, arg_count) == -1) {
         shutdown(client, SHUT_RDWR);
         close(client);
-        return (struct RPCResult){
-            .is_error = 1, .value = rpc_string("Could not write to socket")};
+        return rpc_result_error(rpc_string("Could not write to socket"));
     }
 
     shutdown(client, SHUT_WR);
@@ -113,27 +110,39 @@ struct RPCResult rpc_call_array(
         mut_byte_buffer_destroy(&buffer);
         shutdown(client, SHUT_RD);
         close(client);
-        return (struct RPCResult){
-            .is_error = 1, .value = rpc_string("Could not read response")};
+        return rpc_result_error(rpc_string("Could not read response"));
     }
 
-    struct RPCValue response;
     size_t index = 0;
-    enum RPCDeserializeResult deserialize_result =
-        rpc_value_deserialize(&buffer, &index, &response);
+
+    struct RPCValue is_error_flag;
+    if (rpc_value_deserialize(&buffer, &index, &is_error_flag) !=
+        kRPCDeserializeResultOk) {
+        return rpc_result_error(rpc_string("Could not deserialize error flag"));
+    } else if (is_error_flag.type != kRPCValueTypeInt) {
+        return rpc_result_error(rpc_string("Server sent non-int error flag"));
+    }
+
+    bool is_error = is_error_flag.value_int;
+    rpc_value_destroy(&is_error_flag);
+
+    struct RPCValue value;
+    if (rpc_value_deserialize(&buffer, &index, &value)) {
+        return rpc_result_error(
+            rpc_string("Could not deserialize result value"));
+    }
 
     if (index != mut_byte_buffer_length(&buffer)) {
         mut_byte_buffer_destroy(&buffer);
-        rpc_value_destroy(&response);
+        rpc_value_destroy(&value);
         shutdown(client, SHUT_RD);
         close(client);
-        return (struct RPCResult){
-            .is_error = 1, .value = rpc_string("Server sent additional data")};
+        return rpc_result_error(rpc_string("Server sent additional data"));
     }
 
     mut_byte_buffer_destroy(&buffer);
 
-    return (struct RPCResult){.is_error = 0, .value = response};
+    return is_error ? rpc_result_error(value) : rpc_result_ok(value);
 }
 
 struct RPCResult

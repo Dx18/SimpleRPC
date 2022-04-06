@@ -4,6 +4,7 @@
 
 #include <sys/socket.h>
 
+#include "simple_rpc/rpc_result.h"
 #include "simple_rpc/rpc_value.h"
 
 #include "util/byte_buffer.h"
@@ -12,11 +13,6 @@
 struct RPCClient {
     struct sockaddr* address;
     size_t address_len;
-};
-
-struct RPCResult {
-    int is_error;
-    struct RPCValue value;
 };
 
 void rpc_client_init(
