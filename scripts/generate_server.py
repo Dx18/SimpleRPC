@@ -99,8 +99,13 @@ f"""
 with open(os.path.join(output_path, "server.c"), "w") as server_file:
     server_file.write(
 """#include <arpa/inet.h>
+#include <ctype.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #include "simple_rpc/rpc_server.h"
+
 """)
 
     for header in headers:
@@ -117,20 +122,63 @@ const struct RPCProcedure kProcedures[] = {{
         server_file.write(f"    {{.name = \"{function_name}\", .caller = {function_name}_caller}},\n")
 
     server_file.write(
-"""};
+f"""}};
 
-int main()
-{
-    struct sockaddr_in addr = {
+void print_usage(const char *program_name)
+{{
+    printf("Usage: %s [-h] [-p port]\\n", program_name);
+}}
+
+int main(int argc, char *argv[])
+{{
+    const uint16_t kDefaultPort = 12000;
+    uint16_t port = kDefaultPort;
+
+    while (true) {{
+        int opt = getopt(argc, argv, "hp:");
+        if (opt == -1) {{
+            break;
+        }}
+
+        switch (opt) {{
+        case 'h':
+            print_usage(argv[0]);
+            return EXIT_SUCCESS;
+        case 'p': {{
+            char* parsed_end;
+            long parsed_port = strtol(optarg, &parsed_end, 10);
+            if ((*parsed_end != '\\0' && !isspace(*parsed_end)) ||
+                parsed_port < 0 || parsed_port > UINT16_MAX) {{
+                printf(
+                    "Error: specified port must be unsigned 16-bit integer.\\n");
+                return EXIT_FAILURE;
+            }}
+            port = parsed_port;
+            break;
+        }}
+        default:
+            return EXIT_FAILURE;
+        }}
+    }}
+
+    struct sockaddr_in addr = {{
         .sin_family = AF_INET,
-        .sin_addr = {.s_addr = inet_addr("0.0.0.0")},
-        .sin_port = htons(12000),
-    };
+        .sin_addr = {{.s_addr = inet_addr("0.0.0.0")}},
+        .sin_port = htons(port),
+    }};
 
-    return run_server(
+    printf("Starting server at port %u...\\n", port);
+
+    int result = run_server(
         (const struct sockaddr*)&addr,
         sizeof(addr),
         kProcedures,
         kProcedureCount);
-}
+
+    if (result != EXIT_SUCCESS) {{
+        perror("An error occurred while running a server");
+    }}
+
+    return result;
+}}
 """)
