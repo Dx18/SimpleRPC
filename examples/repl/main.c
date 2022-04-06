@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -96,10 +97,45 @@ bool parse_query(struct RPCValue** out_values, size_t* out_count)
     return true;
 }
 
-int main()
+void print_usage(const char* program_name)
 {
+    printf("Usage: %s [-h] [-p port]\n", program_name);
+}
+
+int main(int argc, char* argv[])
+{
+    const uint16_t kDefaultPort = 12000;
+    uint16_t port = kDefaultPort;
+
+    while (true) {
+        int opt = getopt(argc, argv, "hp:");
+        if (opt == -1) {
+            break;
+        }
+
+        switch (opt) {
+        case 'h':
+            print_usage(argv[0]);
+            return EXIT_SUCCESS;
+        case 'p': {
+            char* parsed_end;
+            long parsed_port = strtol(optarg, &parsed_end, 10);
+            if ((*parsed_end != '\0' && !isspace(*parsed_end)) ||
+                parsed_port < 0 || parsed_port > UINT16_MAX) {
+                printf(
+                    "Error: specified port must be unsigned 16-bit integer.\n");
+                return EXIT_FAILURE;
+            }
+            port = parsed_port;
+            break;
+        }
+        default:
+            return EXIT_FAILURE;
+        }
+    }
+
     struct RPCClient client;
-    rpc_client_init_ipv4(&client, "127.0.0.1", 12000);
+    rpc_client_init_ipv4(&client, "127.0.0.1", port);
 
     bool should_stop = false;
     while (!should_stop) {
@@ -134,6 +170,8 @@ int main()
                 rpc_value_print(result.value);
                 printf("\n");
             }
+
+            rpc_value_destroy(&result.value);
         }
 
         fflush(stdout);
