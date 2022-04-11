@@ -17,7 +17,7 @@ struct RPCValue rpc_string(const char* value)
     return (struct RPCValue){
         .type = kRPCValueTypeString,
         .value_string = value,
-        .value_string_allocated = 0};
+        .value_string_allocated = false};
 }
 
 struct RPCValue rpc_allocated_string(const char* value)
@@ -25,7 +25,7 @@ struct RPCValue rpc_allocated_string(const char* value)
     return (struct RPCValue){
         .type = kRPCValueTypeString,
         .value_string = value,
-        .value_string_allocated = 1};
+        .value_string_allocated = true};
 }
 
 void rpc_value_destroy(const struct RPCValue* value)

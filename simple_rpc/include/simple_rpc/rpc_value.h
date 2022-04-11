@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdbool.h>
+
 /** Type of RPC value. */
 enum RPCValueType {
     /** No value. */
@@ -23,7 +25,7 @@ struct RPCValue {
             /**
              * Indicated whether string was allocated using `malloc`.
              */
-            int value_string_allocated;
+            bool value_string_allocated;
         };
     };
 };
