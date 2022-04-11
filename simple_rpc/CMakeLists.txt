@@ -5,6 +5,7 @@ set(SIMPLE_RPC_LIB_SOURCE
   src/simple_rpc/rpc_result.c
   src/simple_rpc/rpc_serialize.c
   src/simple_rpc/rpc_deserialize.c
+  src/simple_rpc/rpc_value_reader.c
   src/simple_rpc/rpc_server.c
   src/simple_rpc/rpc_client.c)
 

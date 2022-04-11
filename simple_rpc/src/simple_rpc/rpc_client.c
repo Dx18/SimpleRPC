@@ -3,11 +3,13 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
+#include "util/byte_buffer.h"
+
 #include "simple_rpc/rpc_deserialize.h"
 #include "simple_rpc/rpc_result.h"
 #include "simple_rpc/rpc_serialize.h"
 #include "simple_rpc/rpc_value.h"
-#include "util/byte_buffer.h"
+#include "simple_rpc/rpc_value_reader.h"
 
 void rpc_client_init(
     struct RPCClient* client,
@@ -113,10 +115,11 @@ struct RPCResult rpc_call_array(
         return rpc_result_error(rpc_string("Could not read response"));
     }
 
-    size_t index = 0;
+    struct RPCValueReader reader;
+    rpc_value_reader_init(&reader, &buffer);
 
     struct RPCValue is_error_flag;
-    if (rpc_value_deserialize(&buffer, &index, &is_error_flag) !=
+    if (rpc_value_reader_read_next(&reader, &is_error_flag) !=
         kRPCDeserializeResultOk) {
         return rpc_result_error(rpc_string("Could not deserialize error flag"));
     } else if (is_error_flag.type != kRPCValueTypeInt) {
@@ -127,12 +130,12 @@ struct RPCResult rpc_call_array(
     rpc_value_destroy(&is_error_flag);
 
     struct RPCValue value;
-    if (rpc_value_deserialize(&buffer, &index, &value)) {
+    if (rpc_value_reader_read_next(&reader, &value)) {
         return rpc_result_error(
             rpc_string("Could not deserialize result value"));
     }
 
-    if (index != mut_byte_buffer_length(&buffer)) {
+    if (!rpc_value_reader_is_end(&reader)) {
         mut_byte_buffer_destroy(&buffer);
         rpc_value_destroy(&value);
         shutdown(client, SHUT_RD);

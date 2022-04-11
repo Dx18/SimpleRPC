@@ -13,16 +13,18 @@
 #include "simple_rpc/rpc_result.h"
 #include "simple_rpc/rpc_serialize.h"
 #include "simple_rpc/rpc_value.h"
+#include "simple_rpc/rpc_value_reader.h"
 
 static struct RPCResult handle_request(
     const struct MutableByteBuffer* request,
     const struct RPCProcedure* procedures,
     size_t procedure_count)
 {
-    size_t index = 0;
+    struct RPCValueReader reader;
+    rpc_value_reader_init(&reader, request);
 
     struct RPCValue procedure_name;
-    if (rpc_value_deserialize(request, &index, &procedure_name) !=
+    if (rpc_value_reader_read_next(&reader, &procedure_name) !=
         kRPCDeserializeResultOk) {
         return rpc_result_error(
             rpc_string("Could not deserialize procedure name"));
@@ -37,8 +39,8 @@ static struct RPCResult handle_request(
         if (strcmp(procedure_name.value_string, procedures[i].name) == 0) {
             rpc_value_destroy(&procedure_name);
 
-            struct RPCValue value = procedures[i].caller(request, &index);
-            if (index != mut_byte_buffer_length(request)) {
+            struct RPCValue value = procedures[i].caller(&reader);
+            if (!rpc_value_reader_is_end(&reader)) {
                 rpc_value_destroy(&value);
                 return rpc_result_error(
                     rpc_string("Client sent additional information"));

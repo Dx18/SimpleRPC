@@ -42,6 +42,7 @@ for path in os.listdir(input_path):
 #include "simple_rpc/rpc_procedure.h"
 #include "simple_rpc/rpc_server.h"
 #include "simple_rpc/rpc_value.h"
+#include "simple_rpc/rpc_value_reader.h"
 #include "util/byte_buffer.h"
 
 """)
@@ -57,12 +58,12 @@ for path in os.listdir(input_path):
             header_file.write(
 f"""
 struct RPCValue
-{function_name}_caller(const struct MutableByteBuffer* buffer, size_t* index)
+{function_name}_caller(struct RPCValueReader* reader)
 {{
     const size_t kArgCount = {len(params)};
     struct RPCValue args[kArgCount];
     for (size_t i = 0; i < kArgCount; ++i) {{
-        if (rpc_value_deserialize(buffer, index, &args[i]) !=
+        if (rpc_value_reader_read_next(reader, &args[i]) !=
             kRPCDeserializeResultOk) {{
             for (size_t j = 0; j < i; ++j) {{
                 rpc_value_destroy(&args[j]);
